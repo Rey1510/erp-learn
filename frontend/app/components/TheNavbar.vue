@@ -16,6 +16,10 @@ const {
 
 const isSyncModalOpen = ref(false)
 
+const { error: productsError } = useProducts()
+const isBackendSleeping = computed(() => !!productsError.value)
+const isBannerDismissed = ref(false)
+
 withDefaults(defineProps<{
   hasError?: boolean
 }>(), {
@@ -24,12 +28,41 @@ withDefaults(defineProps<{
 </script>
 
 <template>
-  <header 
-    v-if="route.path !== '/login'" 
-    class="border-b sticky top-0 z-30 transition-colors duration-200 backdrop-blur-md"
-    :class="theme === 'light' ? 'bg-white/80 border-slate-200 shadow-sm' : 'bg-slate-900/60 border-slate-800/80'"
-  >
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+  <div v-if="route.path !== '/login'">
+    <!-- Standalone Offline Demo Notice Banner -->
+    <div 
+      v-if="isBackendSleeping && !isBannerDismissed" 
+      class="bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 text-white px-4 py-2 text-xs flex items-center justify-between shadow-md relative z-40"
+    >
+      <div class="max-w-7xl mx-auto flex items-center gap-2 flex-wrap">
+        <span class="text-sm">⚠️</span>
+        <span class="font-bold tracking-wide">Demo Standalone Mode:</span>
+        <span class="text-amber-100">
+          Backend Spring Boot cloud saat ini offline. Anda tetap dapat menguji seluruh fitur dengan simulasi Mock Data interaktif!
+        </span>
+        <a 
+          href="https://github.com/Rey1510/erp-learn#readme" 
+          target="_blank" 
+          rel="noopener noreferrer" 
+          class="underline font-bold text-white hover:text-amber-200 ml-1 inline-flex items-center gap-1"
+        >
+          Jalankan Fullstack Lokal (README) ↗
+        </a>
+      </div>
+      <button 
+        @click="isBannerDismissed = true" 
+        class="text-amber-200 hover:text-white font-bold ml-3 text-sm cursor-pointer p-1"
+        title="Tutup pemberitahuan"
+      >
+        ✕
+      </button>
+    </div>
+
+    <header 
+      class="border-b sticky top-0 z-30 transition-colors duration-200 backdrop-blur-md"
+      :class="theme === 'light' ? 'bg-white/80 border-slate-200 shadow-sm' : 'bg-slate-900/60 border-slate-800/80'"
+    >
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
       <!-- Logo & Brand -->
       <div class="flex items-center gap-6">
         <NuxtLink to="/" class="flex items-center gap-3 group">
@@ -201,4 +234,5 @@ withDefaults(defineProps<{
       @synced="refreshNuxtData"
     />
   </header>
+  </div>
 </template>

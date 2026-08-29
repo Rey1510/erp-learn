@@ -1,5 +1,7 @@
-import type { Order, CreateOrderPayload } from '~/types/order'
-import type { PageResponse, SortDirection } from '~/types/pagination'
+import { MOCK_ORDERS } from '~/utils/mockData'
+
+// Shared reactive client-side mock store when backend is unavailable
+const localMockOrders = ref<Order[]>(JSON.parse(JSON.stringify(MOCK_ORDERS)))
 
 export function useOrders() {
   const config = useRuntimeConfig()
@@ -31,35 +33,77 @@ export function useOrders() {
   })
 
   // Also fetch all orders for global KPI aggregations
-  const { data: allOrders, refresh: refreshAll } = useFetch<Order[]>(API_ORDERS, {
+  const { data: serverAllOrders, refresh: refreshAll } = useFetch<Order[]>(API_ORDERS, {
     default: () => []
   })
 
+  // Fallback computed mock orders when backend is unreachable
+  const isUsingMock = computed(() => !!error.value || !pagedData.value?.content)
+
+  const computedMockFiltered = computed(() => {
+    let list = [...localMockOrders.value]
+    if (searchQuery.value.trim()) {
+      const q = searchQuery.value.toLowerCase()
+      list = list.filter(o => 
+        o.orderNumber.toLowerCase().includes(q) || 
+        o.customerName.toLowerCase().includes(q) ||
+        (o.customerEmail && o.customerEmail.toLowerCase().includes(q))
+      )
+    }
+    if (selectedStatus.value !== 'ALL') {
+      list = list.filter(o => o.status === selectedStatus.value)
+    }
+    list.sort((a, b) => {
+      let valA = (a as any)[sortBy.value] || ''
+      let valB = (b as any)[sortBy.value] || ''
+      if (typeof valA === 'string') return sortDirection.value === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA)
+      return sortDirection.value === 'asc' ? valA - valB : valB - valA
+    })
+    return list
+  })
+
   // 3. Computed Order Lists & Pagination Metadata
-  const orders = computed(() => pagedData.value?.content || [])
-  const totalElements = computed(() => pagedData.value?.totalElements || 0)
-  const totalPages = computed(() => pagedData.value?.totalPages || 1)
-  const isFirst = computed(() => pagedData.value?.first ?? true)
-  const isLast = computed(() => pagedData.value?.last ?? true)
+  const allOrders = computed(() => {
+    if (isUsingMock.value) return localMockOrders.value
+    return serverAllOrders.value && serverAllOrders.value.length > 0 ? serverAllOrders.value : localMockOrders.value
+  })
+
+  const totalElements = computed(() => {
+    if (isUsingMock.value) return computedMockFiltered.value.length
+    return pagedData.value?.totalElements || computedMockFiltered.value.length
+  })
+
+  const totalPages = computed(() => {
+    if (isUsingMock.value) return Math.ceil(totalElements.value / pageSize.value) || 1
+    return pagedData.value?.totalPages || 1
+  })
+
+  const orders = computed(() => {
+    if (isUsingMock.value) {
+      const start = page.value * pageSize.value
+      return computedMockFiltered.value.slice(start, start + pageSize.value)
+    }
+    return pagedData.value?.content || []
+  })
+
+  const isFirst = computed(() => page.value === 0)
+  const isLast = computed(() => page.value >= totalPages.value - 1)
 
   // 100% Server-Side filtered orders
   const filteredOrders = computed(() => orders.value)
 
   // 4. Metrics Dashboard (Calculated from all orders)
   const totalRevenue = computed(() => {
-    if (!allOrders.value) return 0
     return allOrders.value
       .filter(o => o.status === 'PAID')
       .reduce((acc, o) => acc + o.totalAmount, 0)
   })
 
   const pendingOrdersCount = computed(() => {
-    if (!allOrders.value) return 0
     return allOrders.value.filter(o => o.status === 'PENDING').length
   })
 
   const paidOrdersCount = computed(() => {
-    if (!allOrders.value) return 0
     return allOrders.value.filter(o => o.status === 'PAID').length
   })
 
@@ -116,36 +160,76 @@ export function useOrders() {
 
   // 6. Actions
   async function createOrder(payload: CreateOrderPayload) {
-    const res = await $fetch<Order>(API_ORDERS, {
-      method: 'POST',
-      headers: {
-        'bypass-tunnel-reminder': 'true'
-      },
-      body: payload
-    })
-    await Promise.all([refresh(), refreshAll()])
-    return res
+    try {
+      const res = await $fetch<Order>(API_ORDERS, {
+        method: 'POST',
+        headers: {
+          'bypass-tunnel-reminder': 'true'
+        },
+        body: payload
+      })
+      await Promise.all([refresh(), refreshAll()])
+      return res
+    } catch (err) {
+      console.warn('[Orders] Backend offline, saving order to local mock store')
+      const newId = (localMockOrders.value.length > 0 ? Math.max(...localMockOrders.value.map(o => o.id)) : 0) + 1
+      const total = payload.items.reduce((acc, it) => acc + (it.quantity * (it.unitPrice || 0)), 0)
+      const mockOrder: Order = {
+        id: newId,
+        orderNumber: `ORD-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${String(newId).padStart(4, '0')}`,
+        customerName: payload.customerName || 'Pelanggan Umum',
+        customerEmail: payload.customerEmail || 'demo@erp.com',
+        totalAmount: total,
+        status: payload.paymentMethod === 'CASH' ? 'PAID' : 'PENDING',
+        paymentMethod: payload.paymentMethod || 'CASH',
+        paymentRef: `DEMO-REF-${newId}`,
+        createdAt: new Date().toISOString(),
+        items: payload.items.map((it, idx) => ({
+          id: idx + 1,
+          productId: it.productId,
+          productName: it.productName || `Produk #${it.productId}`,
+          quantity: it.quantity,
+          unitPrice: it.unitPrice || 0,
+          subtotal: it.quantity * (it.unitPrice || 0)
+        }))
+      }
+      localMockOrders.value.unshift(mockOrder)
+      return mockOrder
+    }
   }
 
   async function updateOrderStatus(orderId: number, status: 'PAID' | 'CANCELLED' | 'PENDING') {
-    await $fetch(`${API_ORDERS}/${orderId}/status`, {
-      method: 'PUT',
-      headers: {
-        'bypass-tunnel-reminder': 'true'
-      },
-      body: { status }
-    })
-    await Promise.all([refresh(), refreshAll()])
+    try {
+      await $fetch(`${API_ORDERS}/${orderId}/status`, {
+        method: 'PUT',
+        headers: {
+          'bypass-tunnel-reminder': 'true'
+        },
+        body: { status }
+      })
+      await Promise.all([refresh(), refreshAll()])
+    } catch (err) {
+      console.warn('[Orders] Backend offline, updating status in local mock store')
+      const target = localMockOrders.value.find(o => o.id === orderId)
+      if (target) {
+        target.status = status
+      }
+    }
   }
 
   async function reseedOrders() {
-    await $fetch(`${API_ORDERS}/reseed`, {
-      method: 'POST',
-      headers: {
-        'bypass-tunnel-reminder': 'true'
-      }
-    })
-    await Promise.all([refresh(), refreshAll()])
+    try {
+      await $fetch(`${API_ORDERS}/reseed`, {
+        method: 'POST',
+        headers: {
+          'bypass-tunnel-reminder': 'true'
+        }
+      })
+      await Promise.all([refresh(), refreshAll()])
+    } catch (err) {
+      console.warn('[Orders] Backend offline, resetting local mock store')
+      localMockOrders.value = JSON.parse(JSON.stringify(MOCK_ORDERS))
+    }
   }
 
   function formatRupiah(val: number) {

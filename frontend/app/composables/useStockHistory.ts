@@ -9,6 +9,20 @@ export function useStockHistory() {
   const pending = ref(false)
   const error = ref<string | null>(null)
 
+  const localMovements = ref<StockMovement[]>([
+    {
+      id: 1,
+      productId: 1,
+      productName: 'MacBook Pro M3 Max 16"',
+      type: 'RESTOCK',
+      quantityChange: 10,
+      previousStock: 4,
+      currentStock: 14,
+      notes: 'Initial Demo Stock Inflow',
+      createdAt: new Date().toISOString()
+    }
+  ])
+
   async function fetchMovements(productId?: number) {
     pending.value = true
     error.value = null
@@ -19,21 +33,41 @@ export function useStockHistory() {
       })
       movements.value = data || []
     } catch (err: any) {
-      error.value = err.message || 'Gagal memuat riwayat mutasi stok'
-      movements.value = []
+      // Fallback to local mock movements
+      movements.value = productId 
+        ? localMovements.value.filter(m => m.productId === productId)
+        : localMovements.value
     } finally {
       pending.value = false
     }
   }
 
   async function restockProduct(payload: RestockPayload) {
-    const res = await $fetch<StockMovement>(`${API_BASE}/restock`, {
-      method: 'POST',
-      headers: { 'bypass-tunnel-reminder': 'true' },
-      body: payload
-    })
-    await fetchMovements(payload.productId)
-    return res
+    try {
+      const res = await $fetch<StockMovement>(`${API_BASE}/restock`, {
+        method: 'POST',
+        headers: { 'bypass-tunnel-reminder': 'true' },
+        body: payload
+      })
+      await fetchMovements(payload.productId)
+      return res
+    } catch (err) {
+      console.warn('[StockHistory] Backend offline, recording restock to mock history')
+      const mockMovement: StockMovement = {
+        id: localMovements.value.length + 1,
+        productId: payload.productId,
+        productName: `Produk #${payload.productId}`,
+        type: 'RESTOCK',
+        quantityChange: payload.quantity,
+        previousStock: 0,
+        currentStock: payload.quantity,
+        notes: payload.notes || 'Restock Standalone Demo',
+        createdAt: new Date().toISOString()
+      }
+      localMovements.value.unshift(mockMovement)
+      await fetchMovements(payload.productId)
+      return mockMovement
+    }
   }
 
   function getMovementBadge(type: MovementType) {
