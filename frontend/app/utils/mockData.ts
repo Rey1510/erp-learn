@@ -3,29 +3,29 @@ import type { Order } from '~/types/order'
 import type { StockMovement } from '~/types/audit'
 
 export const MOCK_PRODUCTS: Product[] = [
-  { id: 1, name: 'MacBook Pro M3 Max 16"', sku: 'LAP-MBP-01', category: 'Electronics', price: 38999000, stock: 14, status: 'AVAILABLE', createdAt: '2026-08-20T08:00:00Z', updatedAt: '2026-08-20T08:00:00Z' },
-  { id: 2, name: 'Dell UltraSharp 27" 4K', sku: 'MON-DEL-03', category: 'Electronics', price: 8250000, stock: 8, status: 'AVAILABLE', createdAt: '2026-08-20T08:00:00Z', updatedAt: '2026-08-20T08:00:00Z' },
-  { id: 3, name: 'iPad Pro 11" M4 OLED', sku: 'TAB-APP-06', category: 'Electronics', price: 17499000, stock: 12, status: 'AVAILABLE', createdAt: '2026-08-20T08:00:00Z', updatedAt: '2026-08-20T08:00:00Z' },
-  { id: 4, name: 'ThinkPad X1 Carbon Gen 11', sku: 'LAP-LEN-07', category: 'Electronics', price: 29500000, stock: 6, status: 'AVAILABLE', createdAt: '2026-08-20T08:00:00Z', updatedAt: '2026-08-20T08:00:00Z' },
+  { id: 1, name: 'MacBook Pro M3 Max 16"', sku: 'LAP-MBP-01', category: 'Electronics', price: 38999000, stock: 14, status: 'IN_STOCK', createdAt: '2026-08-20T08:00:00Z', updatedAt: '2026-08-20T08:00:00Z' },
+  { id: 2, name: 'Dell UltraSharp 27" 4K', sku: 'MON-DEL-03', category: 'Electronics', price: 8250000, stock: 8, status: 'IN_STOCK', createdAt: '2026-08-20T08:00:00Z', updatedAt: '2026-08-20T08:00:00Z' },
+  { id: 3, name: 'iPad Pro 11" M4 OLED', sku: 'TAB-APP-06', category: 'Electronics', price: 17499000, stock: 12, status: 'IN_STOCK', createdAt: '2026-08-20T08:00:00Z', updatedAt: '2026-08-20T08:00:00Z' },
+  { id: 4, name: 'ThinkPad X1 Carbon Gen 11', sku: 'LAP-LEN-07', category: 'Electronics', price: 29500000, stock: 6, status: 'IN_STOCK', createdAt: '2026-08-20T08:00:00Z', updatedAt: '2026-08-20T08:00:00Z' },
   { id: 5, name: 'Samsung Odyssey Neo G9 49"', sku: 'MON-SAM-08', category: 'Electronics', price: 21500000, stock: 3, status: 'LOW_STOCK', createdAt: '2026-08-20T08:00:00Z', updatedAt: '2026-08-20T08:00:00Z' },
-  { id: 6, name: 'Logitech MX Master 3S', sku: 'ACC-LOG-02', category: 'Accessories', price: 1650000, stock: 25, status: 'AVAILABLE', createdAt: '2026-08-20T08:00:00Z', updatedAt: '2026-08-20T08:00:00Z' },
-  { id: 7, name: 'Keychron Q1 Pro Wireless', sku: 'KEY-KCR-04', category: 'Accessories', price: 2890000, stock: 18, status: 'AVAILABLE', createdAt: '2026-08-20T08:00:00Z', updatedAt: '2026-08-20T08:00:00Z' },
-  { id: 8, name: 'Anker 737 Power Bank 140W', sku: 'ACC-ANK-09', category: 'Accessories', price: 1850000, stock: 30, status: 'AVAILABLE', createdAt: '2026-08-20T08:00:00Z', updatedAt: '2026-08-20T08:00:00Z' },
-  { id: 9, name: 'CalDigit TS4 Thunderbolt 4 Dock', sku: 'ACC-CDG-10', category: 'Accessories', price: 6200000, stock: 7, status: 'AVAILABLE', createdAt: '2026-08-20T08:00:00Z', updatedAt: '2026-08-20T08:00:00Z' },
-  { id: 10, name: 'NuPhy Air75 V2 Low-Profile', sku: 'KEY-NUP-11', category: 'Accessories', price: 1950000, stock: 15, status: 'AVAILABLE', createdAt: '2026-08-20T08:00:00Z', updatedAt: '2026-08-20T08:00:00Z' },
-  { id: 11, name: 'Ergonomic Standing Desk 160x80', sku: 'FRN-DSK-05', category: 'Furniture', price: 5400000, stock: 10, status: 'AVAILABLE', createdAt: '2026-08-20T08:00:00Z', updatedAt: '2026-08-20T08:00:00Z' },
+  { id: 6, name: 'Logitech MX Master 3S', sku: 'ACC-LOG-02', category: 'Accessories', price: 1650000, stock: 25, status: 'IN_STOCK', createdAt: '2026-08-20T08:00:00Z', updatedAt: '2026-08-20T08:00:00Z' },
+  { id: 7, name: 'Keychron Q1 Pro Wireless', sku: 'KEY-KCR-04', category: 'Accessories', price: 2890000, stock: 18, status: 'IN_STOCK', createdAt: '2026-08-20T08:00:00Z', updatedAt: '2026-08-20T08:00:00Z' },
+  { id: 8, name: 'Anker 737 Power Bank 140W', sku: 'ACC-ANK-09', category: 'Accessories', price: 1850000, stock: 30, status: 'IN_STOCK', createdAt: '2026-08-20T08:00:00Z', updatedAt: '2026-08-20T08:00:00Z' },
+  { id: 9, name: 'CalDigit TS4 Thunderbolt 4 Dock', sku: 'ACC-CDG-10', category: 'Accessories', price: 6200000, stock: 7, status: 'IN_STOCK', createdAt: '2026-08-20T08:00:00Z', updatedAt: '2026-08-20T08:00:00Z' },
+  { id: 10, name: 'NuPhy Air75 V2 Low-Profile', sku: 'KEY-NUP-11', category: 'Accessories', price: 1950000, stock: 15, status: 'IN_STOCK', createdAt: '2026-08-20T08:00:00Z', updatedAt: '2026-08-20T08:00:00Z' },
+  { id: 11, name: 'Ergonomic Standing Desk 160x80', sku: 'FRN-DSK-05', category: 'Furniture', price: 5400000, stock: 10, status: 'IN_STOCK', createdAt: '2026-08-20T08:00:00Z', updatedAt: '2026-08-20T08:00:00Z' },
   { id: 12, name: 'Herman Miller Aeron Chair', sku: 'FRN-HMA-12', category: 'Furniture', price: 22500000, stock: 5, status: 'LOW_STOCK', createdAt: '2026-08-20T08:00:00Z', updatedAt: '2026-08-20T08:00:00Z' },
   { id: 13, name: 'Steelcase Gesture Office Chair', sku: 'FRN-STC-13', category: 'Furniture', price: 18900000, stock: 4, status: 'LOW_STOCK', createdAt: '2026-08-20T08:00:00Z', updatedAt: '2026-08-20T08:00:00Z' },
-  { id: 14, name: 'Dual Monitor Heavy Duty Arm', sku: 'FRN-ARM-14', category: 'Furniture', price: 1250000, stock: 20, status: 'AVAILABLE', createdAt: '2026-08-20T08:00:00Z', updatedAt: '2026-08-20T08:00:00Z' },
-  { id: 15, name: 'Acoustic Felt Desk Partition', sku: 'FRN-PRT-15', category: 'Furniture', price: 850000, stock: 12, status: 'AVAILABLE', createdAt: '2026-08-20T08:00:00Z', updatedAt: '2026-08-20T08:00:00Z' },
-  { id: 16, name: 'Sony WH-1000XM5 ANC Headphones', sku: 'AUD-SNY-16', category: 'Audio', price: 4999000, stock: 16, status: 'AVAILABLE', createdAt: '2026-08-20T08:00:00Z', updatedAt: '2026-08-20T08:00:00Z' },
-  { id: 17, name: 'Shure SM7B Dynamic Microphone', sku: 'AUD-SHR-17', category: 'Audio', price: 6450000, stock: 9, status: 'AVAILABLE', createdAt: '2026-08-20T08:00:00Z', updatedAt: '2026-08-20T08:00:00Z' },
-  { id: 18, name: 'Audioengine A2+ Wireless Speakers', sku: 'AUD-AEN-18', category: 'Audio', price: 4350000, stock: 8, status: 'AVAILABLE', createdAt: '2026-08-20T08:00:00Z', updatedAt: '2026-08-20T08:00:00Z' },
+  { id: 14, name: 'Dual Monitor Heavy Duty Arm', sku: 'FRN-ARM-14', category: 'Furniture', price: 1250000, stock: 20, status: 'IN_STOCK', createdAt: '2026-08-20T08:00:00Z', updatedAt: '2026-08-20T08:00:00Z' },
+  { id: 15, name: 'Acoustic Felt Desk Partition', sku: 'FRN-PRT-15', category: 'Furniture', price: 850000, stock: 12, status: 'IN_STOCK', createdAt: '2026-08-20T08:00:00Z', updatedAt: '2026-08-20T08:00:00Z' },
+  { id: 16, name: 'Sony WH-1000XM5 ANC Headphones', sku: 'AUD-SNY-16', category: 'Audio', price: 4999000, stock: 16, status: 'IN_STOCK', createdAt: '2026-08-20T08:00:00Z', updatedAt: '2026-08-20T08:00:00Z' },
+  { id: 17, name: 'Shure SM7B Dynamic Microphone', sku: 'AUD-SHR-17', category: 'Audio', price: 6450000, stock: 9, status: 'IN_STOCK', createdAt: '2026-08-20T08:00:00Z', updatedAt: '2026-08-20T08:00:00Z' },
+  { id: 18, name: 'Audioengine A2+ Wireless Speakers', sku: 'AUD-AEN-18', category: 'Audio', price: 4350000, stock: 8, status: 'IN_STOCK', createdAt: '2026-08-20T08:00:00Z', updatedAt: '2026-08-20T08:00:00Z' },
   { id: 19, name: 'Rodecaster Pro II Audio Console', sku: 'AUD-RDE-19', category: 'Audio', price: 10800000, stock: 4, status: 'LOW_STOCK', createdAt: '2026-08-20T08:00:00Z', updatedAt: '2026-08-20T08:00:00Z' },
   { id: 20, name: 'Sennheiser HD 660S2 Open-Back', sku: 'AUD-SNY-20', category: 'Audio', price: 7890000, stock: 5, status: 'LOW_STOCK', createdAt: '2026-08-20T08:00:00Z', updatedAt: '2026-08-20T08:00:00Z' },
-  { id: 21, name: 'Rhode Leather Desk Mat 90x40', sku: 'STN-MAT-21', category: 'Stationery', price: 450000, stock: 40, status: 'AVAILABLE', createdAt: '2026-08-20T08:00:00Z', updatedAt: '2026-08-20T08:00:00Z' },
-  { id: 22, name: 'Rotring 600 Mechanical Pencil', sku: 'STN-RTR-22', category: 'Stationery', price: 420000, stock: 50, status: 'AVAILABLE', createdAt: '2026-08-20T08:00:00Z', updatedAt: '2026-08-20T08:00:00Z' },
-  { id: 23, name: 'Leuchtturm1917 Hardcover Notebook', sku: 'STN-LCH-23', category: 'Stationery', price: 320000, stock: 35, status: 'AVAILABLE', createdAt: '2026-08-20T08:00:00Z', updatedAt: '2026-08-20T08:00:00Z' }
+  { id: 21, name: 'Rhode Leather Desk Mat 90x40', sku: 'STN-MAT-21', category: 'Stationery', price: 450000, stock: 40, status: 'IN_STOCK', createdAt: '2026-08-20T08:00:00Z', updatedAt: '2026-08-20T08:00:00Z' },
+  { id: 22, name: 'Rotring 600 Mechanical Pencil', sku: 'STN-RTR-22', category: 'Stationery', price: 420000, stock: 50, status: 'IN_STOCK', createdAt: '2026-08-20T08:00:00Z', updatedAt: '2026-08-20T08:00:00Z' },
+  { id: 23, name: 'Leuchtturm1917 Hardcover Notebook', sku: 'STN-LCH-23', category: 'Stationery', price: 320000, stock: 35, status: 'IN_STOCK', createdAt: '2026-08-20T08:00:00Z', updatedAt: '2026-08-20T08:00:00Z' }
 ]
 
 const now = new Date()

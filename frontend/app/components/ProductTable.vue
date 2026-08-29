@@ -326,13 +326,13 @@ function getSortIcon(field: string) {
 
             <td class="px-5 py-4 text-center whitespace-nowrap">
               <span 
-                v-if="p.status === 'IN_STOCK'" 
+                v-if="p.status === 'IN_STOCK' || p.stock > 5" 
                 class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 whitespace-nowrap"
               >
                 {{ t('home.inStock') }}
               </span>
               <span 
-                v-else-if="p.status === 'LOW_STOCK'" 
+                v-else-if="p.status === 'LOW_STOCK' || (p.stock > 0 && p.stock <= 5)" 
                 class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-500/10 text-amber-500 border border-amber-500/20 whitespace-nowrap"
               >
                 {{ t('home.lowStock') }}

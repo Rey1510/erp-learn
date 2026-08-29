@@ -54,7 +54,13 @@ export function useProducts() {
       list = list.filter(p => p.category === selectedCategory.value)
     }
     if (selectedStatus.value !== 'ALL') {
-      list = list.filter(p => p.status === selectedStatus.value)
+      if (selectedStatus.value === 'IN_STOCK') {
+        list = list.filter(p => p.status === 'IN_STOCK' || p.stock > 5)
+      } else if (selectedStatus.value === 'LOW_STOCK') {
+        list = list.filter(p => p.status === 'LOW_STOCK' || (p.stock > 0 && p.stock <= 5))
+      } else if (selectedStatus.value === 'OUT_OF_STOCK') {
+        list = list.filter(p => p.status === 'OUT_OF_STOCK' || p.stock === 0)
+      }
     }
     list.sort((a, b) => {
       let valA = (a as any)[sortBy.value]
