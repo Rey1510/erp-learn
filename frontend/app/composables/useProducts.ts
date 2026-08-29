@@ -2,7 +2,9 @@ import type { Product, ProductFormData } from '~/types/product'
 import type { PageResponse, SortDirection } from '~/types/pagination'
 
 export function useProducts() {
-  const API_BASE = 'http://localhost:8080/api/products'
+  const config = useRuntimeConfig()
+  const apiBase = config.public.apiBase || 'http://localhost:8080'
+  const API_BASE = `${apiBase}/api/products`
 
   // 1. Pagination & Sorting State
   const page = ref(0)
@@ -17,6 +19,9 @@ export function useProducts() {
 
   // 2. Fetch Server-Side Paginated Products
   const { data: pagedData, pending, error, refresh } = useFetch<PageResponse<Product>>(`${API_BASE}/paged`, {
+    headers: {
+      'bypass-tunnel-reminder': 'true'
+    },
     query: computed(() => ({
       page: page.value,
       size: pageSize.value,

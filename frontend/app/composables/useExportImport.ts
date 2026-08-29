@@ -1,5 +1,7 @@
 export function useExportImport() {
-  const API_BASE = 'http://localhost:8080/api'
+  const config = useRuntimeConfig()
+  const apiBase = config.public.apiBase || 'http://localhost:8080'
+  const API_BASE = `${apiBase}/api`
 
   const isExporting = ref(false)
   const isImporting = ref(false)

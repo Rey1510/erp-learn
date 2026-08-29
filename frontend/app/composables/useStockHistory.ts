@@ -1,7 +1,9 @@
 import type { StockMovement, RestockPayload, MovementType } from '~/types/audit'
 
 export function useStockHistory() {
-  const API_BASE = 'http://localhost:8080/api/stock-movements'
+  const config = useRuntimeConfig()
+  const apiBase = config.public.apiBase || 'http://localhost:8080'
+  const API_BASE = `${apiBase}/api/stock-movements`
 
   const movements = ref<StockMovement[]>([])
   const pending = ref(false)
@@ -12,7 +14,9 @@ export function useStockHistory() {
     error.value = null
     try {
       const url = productId ? `${API_BASE}/product/${productId}` : API_BASE
-      const data = await $fetch<StockMovement[]>(url)
+      const data = await $fetch<StockMovement[]>(url, {
+        headers: { 'bypass-tunnel-reminder': 'true' }
+      })
       movements.value = data || []
     } catch (err: any) {
       error.value = err.message || 'Gagal memuat riwayat mutasi stok'
@@ -25,6 +29,7 @@ export function useStockHistory() {
   async function restockProduct(payload: RestockPayload) {
     const res = await $fetch<StockMovement>(`${API_BASE}/restock`, {
       method: 'POST',
+      headers: { 'bypass-tunnel-reminder': 'true' },
       body: payload
     })
     await fetchMovements(payload.productId)

@@ -185,7 +185,8 @@ export function useOfflineSync() {
             method: 'POST',
             headers: {
               'X-Idempotency-Key': item.idempotencyKey,
-              'Content-Type': 'application/json'
+              'Content-Type': 'application/json',
+              'bypass-tunnel-reminder': 'true'
             },
             body: item.payload
           })

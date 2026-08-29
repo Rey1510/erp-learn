@@ -73,7 +73,9 @@ async function fetchPaymentDetails() {
   if (!props.order) return
   try {
     isLoadingPayment.value = true
-    const res = await $fetch<Payment>(`${apiBase}/api/payments/order/${props.order.id}`)
+    const res = await $fetch<Payment>(`${apiBase}/api/payments/order/${props.order.id}`, {
+      headers: { 'bypass-tunnel-reminder': 'true' }
+    })
     payment.value = res
     updateCountdown()
   } catch (err) {
@@ -92,6 +94,7 @@ async function runSimulation(action: 'SETTLE' | 'EXPIRE' | 'FAIL') {
 
     const updatedPayment = await $fetch<Payment>(`${apiBase}/api/payments/${payment.value.id}/simulate`, {
       method: 'POST',
+      headers: { 'bypass-tunnel-reminder': 'true' },
       body: {
         action,
         notes: `Simulasi interaktif dijalankan oleh penguji (${action})`
@@ -101,7 +104,9 @@ async function runSimulation(action: 'SETTLE' | 'EXPIRE' | 'FAIL') {
     payment.value = updatedPayment
 
     // Fetch updated order
-    const updatedOrder = await $fetch<Order>(`${apiBase}/api/orders/${props.order!.id}`)
+    const updatedOrder = await $fetch<Order>(`${apiBase}/api/orders/${props.order!.id}`, {
+      headers: { 'bypass-tunnel-reminder': 'true' }
+    })
 
     if (action === 'SETTLE') {
       simulationMessage.value = '✅ Pembayaran Berhasil! Mengupdate struk kasir...'

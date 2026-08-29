@@ -1,7 +1,9 @@
 import type { User, AuthResponse } from '~/types/auth'
 
 export function useAuth() {
-  const API_BASE = 'http://localhost:8080/api/auth'
+  const config = useRuntimeConfig()
+  const apiBase = config.public.apiBase || 'http://localhost:8080'
+  const API_BASE = `${apiBase}/api/auth`
   
   const authCookie = useCookie<User | null>('erp_auth_user', {
     default: () => null,
@@ -29,6 +31,9 @@ export function useAuth() {
     try {
       const res = await $fetch<AuthResponse>(`${API_BASE}/login`, {
         method: 'POST',
+        headers: {
+          'bypass-tunnel-reminder': 'true'
+        },
         body: { email, password }
       })
 

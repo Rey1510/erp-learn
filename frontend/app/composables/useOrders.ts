@@ -2,7 +2,9 @@ import type { Order, CreateOrderPayload } from '~/types/order'
 import type { PageResponse, SortDirection } from '~/types/pagination'
 
 export function useOrders() {
-  const API_ORDERS = 'http://localhost:8080/api/orders'
+  const config = useRuntimeConfig()
+  const apiBase = config.public.apiBase || 'http://localhost:8080'
+  const API_ORDERS = `${apiBase}/api/orders`
 
   // 1. Pagination & Sorting State
   const page = ref(0)
@@ -14,6 +16,9 @@ export function useOrders() {
 
   // 2. Fetch Server-Side Paginated Orders
   const { data: pagedData, pending, error, refresh } = useFetch<PageResponse<Order>>(`${API_ORDERS}/paged`, {
+    headers: {
+      'bypass-tunnel-reminder': 'true'
+    },
     query: computed(() => ({
       page: page.value,
       size: pageSize.value,
@@ -113,6 +118,9 @@ export function useOrders() {
   async function createOrder(payload: CreateOrderPayload) {
     const res = await $fetch<Order>(API_ORDERS, {
       method: 'POST',
+      headers: {
+        'bypass-tunnel-reminder': 'true'
+      },
       body: payload
     })
     await Promise.all([refresh(), refreshAll()])
@@ -122,6 +130,9 @@ export function useOrders() {
   async function updateOrderStatus(orderId: number, status: 'PAID' | 'CANCELLED' | 'PENDING') {
     await $fetch(`${API_ORDERS}/${orderId}/status`, {
       method: 'PUT',
+      headers: {
+        'bypass-tunnel-reminder': 'true'
+      },
       body: { status }
     })
     await Promise.all([refresh(), refreshAll()])
@@ -129,7 +140,10 @@ export function useOrders() {
 
   async function reseedOrders() {
     await $fetch(`${API_ORDERS}/reseed`, {
-      method: 'POST'
+      method: 'POST',
+      headers: {
+        'bypass-tunnel-reminder': 'true'
+      }
     })
     await Promise.all([refresh(), refreshAll()])
   }
