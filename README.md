@@ -118,6 +118,57 @@ Use the quick autofill buttons on the login page (`/login`) or type the credenti
 * Instant switch between **Dark Mode** (Obsidian Slate Glassmorphism) and **Light Mode** (Crisp Corporate White/Slate-50).
 * **SSR Cookie Persistence** (`erp_theme`, `erp_locale`, `erp_auth_user`): Zero layout shift or hydration flash on browser refresh.
 
+### 7. 🔒 Concurrency Control & Pessimistic Locking (Zero Overselling)
+* **Pessimistic Write Lock (`SELECT ... FOR UPDATE`)**: Implements database row-level locking via JPA `@Lock(LockModeType.PESSIMISTIC_WRITE)` when reading and deducting product inventory.
+* **Deadlock Prevention**: Deterministic item ordering (`productId` ASC) during multi-item transactions prevents circular wait locks across concurrent POS cashiers.
+* **Collision-Free Invoicing**: Generates microsecond-precise, non-colliding order numbers (`ORD-YYYYMMDDHHMMSS-XXXX`) under heavy simultaneous traffic.
+* **Domain Exception**: Returns structured `400 Bad Request` with `INSUFFICIENT_STOCK` payload to prevent race-condition overselling.
+
+### 8. 🛡️ Idempotent API & 💳 Mock Payment Gateway Sandbox (Portfolio Mode)
+* **`X-Idempotency-Key` Protection**: Prevents double-billing and duplicate stock deductions on network retry or double-click checkout via SHA-256 payload hashing and atomic response caching (`IdempotencyRecord`).
+* **Built-in Fintech Sandbox Simulator**:
+  * 📱 **QRIS**: Real SVG dynamic QR matrix with 15-minute countdown and Indonesian Standard NMID.
+  * 🏦 **Virtual Account**: BCA / Bank Mandiri copyable VA numbers with ATM payment instructions.
+  * 💳 **Credit Card**: Mock 3DS OTP authorization flow.
+  * 💵 **Tunai (Cash)**: Instant POS cash settlement.
+* **Interactive Webhook Control Panel**:
+  * 🟢 **Simulate Pay**: Triggers simulated settlement webhook (`SETTLE` -> Order `PAID`).
+  * ⏱️ **Simulate Expire**: Simulates payment timeout (`EXPIRE` -> Order `CANCELLED`, automatic stock restoration `CANCEL_RESTOCK`).
+  * 🔴 **Simulate Fail**: Simulates declined card or insufficient funds with auto-restock.
+* **Automatic Expiration Scheduler**: Spring Boot `@Scheduled` worker automatically checks and marks expired transactions while releasing reserved inventory back to the warehouse catalog.
+* **Zero External Dependencies**: Anyone cloning the repository can test realistic enterprise fintech flows immediately without needing third-party API keys (Midtrans/Stripe).
+
+### 9. ⚡ POS Offline-First Mode & 🗄️ IndexedDB Background Sync Engine
+* **Zero Downtime Checkout**: Cashiers can continue creating transactions and generating thermal receipts even when internet connectivity drops.
+* **Browser IndexedDB Outbox Queue (`ERP_OFFLINE_POS_DB`)**: Securely queues offline transactions as `PENDING_SYNC` with temporary offline invoice codes (`OFFLINE-ORD-...`).
+* **Optimistic Local Inventory**: Automatically decrements local stock counts in real time to prevent physical overselling at the storefront.
+* **Resilient Background Sync Dispatcher**:
+  * Automatically detects network recovery via `window.addEventListener('online')` and flushes the outbox queue to Spring Boot (`POST /api/orders`).
+  * Seamlessly applies `X-Idempotency-Key` (`IDEM-OFFLINE-...`) during synchronization to ensure zero duplicate records.
+* **Built-in Offline Simulator & Sync Center**:
+  * Dedicated **Offline Sync Center Modal** to monitor queue status (`PENDING_SYNC` $\to$ `SYNCING` $\to$ `SYNCED`).
+  * 🔴/🟢 Interactive simulation switch on the top navigation bar for easy portfolio demonstrations without disabling physical Wi-Fi.
+
+---
+
+## 🧪 Automated Testing & Integrity Verification
+
+Run the full Spring Boot test suite:
+
+```bash
+cd backend
+mvn -s settings-public.xml test
+```
+
+### Verified Test Suites:
+1. **`OrderServiceConcurrencyTest`** (10 parallel threads):
+   * ✅ Exactly 1 winner cashier captures the lock and checks out.
+   * ✅ 9 cashiers receive safe `InsufficientStockException`.
+   * ✅ Final stock in PostgreSQL remains strictly `0` (`OUT_OF_STOCK`), never negative.
+2. **`OrderServiceIdempotencyTest`** (5 repeated submissions with same `X-Idempotency-Key`):
+   * ✅ Returns identical invoice metadata across all 5 requests.
+   * ✅ Stock is deducted **only once**, proving zero double-billing.
+
 ---
 
 ## 📂 Project Directory Structure

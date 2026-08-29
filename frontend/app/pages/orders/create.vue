@@ -3,19 +3,30 @@ import type { Product } from '~/types/product'
 import type { CreateOrderPayload, Order } from '~/types/order'
 
 const router = useRouter()
-const { products, pending: productsPending, formatRupiah, refresh: refreshProducts } = useProducts()
-const { createOrder, formatDate } = useOrders()
+const { allProducts, pending: productsPending, formatRupiah, refresh: refreshProducts } = useProducts()
+const { createOrder, formatDate, refresh: refreshOrders } = useOrders()
 const { t } = useI18n()
 const { theme } = useTheme()
+const {
+  isOnline,
+  isSimulatedOffline,
+  effectiveOnline,
+  queueOfflineOrder,
+  toggleSimulatedOffline
+} = useOfflineSync()
 
 // State Form Customer
 const customerName = ref('')
 const customerEmail = ref('')
 const isSubmitting = ref(false)
 
-// State Receipt Modal on Success
+// Payment Method State
+const selectedPaymentMethod = ref<'CASH' | 'QRIS' | 'BANK_TRANSFER_VA' | 'CREDIT_CARD'>('CASH')
+
+// State Modals
 const createdOrder = ref<Order | null>(null)
 const isReceiptModalOpen = ref(false)
+const isSimulatorModalOpen = ref(false)
 
 // State Search Katalog
 const searchProduct = ref('')
@@ -29,8 +40,8 @@ interface CartItem {
 const cart = ref<CartItem[]>([])
 
 const availableProducts = computed(() => {
-  if (!products.value) return []
-  return products.value.filter(p => {
+  if (!allProducts.value) return []
+  return allProducts.value.filter(p => {
     const match = p.name.toLowerCase().includes(searchProduct.value.toLowerCase()) ||
                   p.sku.toLowerCase().includes(searchProduct.value.toLowerCase())
     return match && p.stock > 0
@@ -89,24 +100,109 @@ async function submitOrder() {
 
   try {
     isSubmitting.value = true
+
+    // Generate Client-Side Idempotency Key (UUID) to prevent double billing
+    const idempotencyKey = (typeof crypto !== 'undefined' && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : 'IDEM-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8)
+
     const payload: CreateOrderPayload = {
       customerName: customerName.value,
       customerEmail: customerEmail.value || undefined,
+      paymentMethod: selectedPaymentMethod.value,
+      idempotencyKey,
       items: cart.value.map(i => ({
         productId: i.product.id,
         quantity: i.quantity
       }))
     }
 
+    // ⚡ OFFLINE MODE INTERCEPTION
+    if (!effectiveOnline.value) {
+      // 1. Queue to IndexedDB Outbox
+      const outboxItem = await queueOfflineOrder(
+        payload,
+        cart.value.map(i => ({
+          productName: i.product.name,
+          quantity: i.quantity,
+          unitPrice: i.product.price,
+          subtotal: i.product.price * i.quantity
+        })),
+        customerName.value,
+        customerEmail.value || '',
+        selectedPaymentMethod.value,
+        grandTotal.value
+      )
+
+      // 2. Deduct local optimistic stock
+      cart.value.forEach(item => {
+        const prod = (allProducts.value || []).find(p => p.id === item.product.id)
+        if (prod) {
+          prod.stock = Math.max(0, prod.stock - item.quantity)
+        }
+      })
+
+      // 3. Synthesize createdOrder object for thermal receipt preview
+      createdOrder.value = {
+        id: outboxItem.id || Date.now(),
+        orderNumber: outboxItem.tempOrderNumber,
+        customerName: outboxItem.customerName,
+        customerEmail: outboxItem.customerEmail,
+        totalAmount: outboxItem.totalAmount,
+        status: selectedPaymentMethod.value === 'CASH' ? 'PAID' : 'PENDING',
+        paymentMethod: outboxItem.paymentMethod,
+        paymentRef: 'OFFLINE-QUEUED (IndexedDB)',
+        items: cart.value.map((item, idx) => ({
+          id: idx + 1,
+          product: item.product,
+          productName: item.product.name,
+          quantity: item.quantity,
+          unitPrice: item.product.price,
+          subtotal: item.product.price * item.quantity
+        })),
+        createdAt: outboxItem.createdAt
+      }
+
+      // 4. Open receipt modal directly & clear cart
+      isReceiptModalOpen.value = true
+      cart.value = []
+      customerName.value = ''
+      customerEmail.value = ''
+      return
+    }
+
+    // 🌐 ONLINE MODE CHECKOUT
     const orderRes = await createOrder(payload)
     await refreshProducts() // Update sisa stok di katalog
     createdOrder.value = orderRes
-    isReceiptModalOpen.value = true
+
+    if (selectedPaymentMethod.value === 'CASH') {
+      isReceiptModalOpen.value = true
+    } else {
+      isSimulatorModalOpen.value = true
+    }
   } catch (err: any) {
+    await refreshProducts().catch(() => {})
     alert('Gagal membuat transaksi: ' + (err.data?.error || err.message || err))
   } finally {
     isSubmitting.value = false
   }
+}
+
+function handlePaymentSettled(updatedOrder: Order) {
+  createdOrder.value = updatedOrder
+  isSimulatorModalOpen.value = false
+  isReceiptModalOpen.value = true
+  refreshProducts()
+  refreshOrders?.().catch(() => {})
+}
+
+function handlePaymentCancelled(updatedOrder: Order) {
+  createdOrder.value = updatedOrder
+  isSimulatorModalOpen.value = false
+  refreshProducts()
+  refreshOrders?.().catch(() => {})
+  alert('Transaksi dibatalkan / expired. Stok produk telah otomatis dikembalikan ke katalog.')
 }
 
 function handleReceiptClosed() {
@@ -130,6 +226,28 @@ function handleReceiptClosed() {
           {{ t('pos.desc') }}
         </p>
       </div>
+    </div>
+
+    <!-- Offline Status Warning Banner -->
+    <div 
+      v-if="!effectiveOnline"
+      class="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 flex items-center justify-between gap-3 text-xs animate-in fade-in"
+    >
+      <div class="flex items-center gap-3">
+        <span class="text-xl">⚡</span>
+        <div>
+          <div class="font-bold text-amber-200">Mode POS Offline Aktif (Zero Downtime POS)</div>
+          <div class="text-[11px] text-amber-400/80 mt-0.5">
+            Koneksi server terputus / simulasi offline. Transaksi akan disimpan sementara di <strong>IndexedDB browser</strong> dan disinkronkan otomatis saat online kembali.
+          </div>
+        </div>
+      </div>
+      <button 
+        @click="toggleSimulatedOffline"
+        class="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 text-xs font-semibold cursor-pointer shrink-0 transition"
+      >
+        Kembali Online
+      </button>
     </div>
 
     <!-- 2 Column Layout: Katalog Produk & Keranjang Checkout -->
@@ -309,6 +427,78 @@ function handleReceiptClosed() {
           </div>
         </div>
 
+        <!-- Payment Method Selection -->
+        <div class="pt-4 border-t space-y-2" :class="theme === 'light' ? 'border-slate-200' : 'border-slate-800'">
+          <label class="block text-xs font-bold" :class="theme === 'light' ? 'text-slate-700' : 'text-slate-300'">
+            Metode Pembayaran:
+          </label>
+          <div class="grid grid-cols-2 gap-2">
+            <!-- 1. Cash -->
+            <button
+              type="button"
+              @click="selectedPaymentMethod = 'CASH'"
+              class="p-2.5 rounded-xl border text-left flex items-center gap-2 transition cursor-pointer"
+              :class="selectedPaymentMethod === 'CASH'
+                ? 'border-indigo-500 bg-indigo-500/10 text-indigo-400 font-bold'
+                : (theme === 'light' ? 'border-slate-200 hover:border-slate-300 text-slate-700' : 'border-slate-800 hover:border-slate-700 text-slate-400')"
+            >
+              <span class="text-base">💵</span>
+              <div>
+                <div class="text-xs font-semibold">Tunai (Cash)</div>
+                <div class="text-[9px] opacity-70">Direct Settlement</div>
+              </div>
+            </button>
+
+            <!-- 2. QRIS -->
+            <button
+              type="button"
+              @click="selectedPaymentMethod = 'QRIS'"
+              class="p-2.5 rounded-xl border text-left flex items-center gap-2 transition cursor-pointer"
+              :class="selectedPaymentMethod === 'QRIS'
+                ? 'border-indigo-500 bg-indigo-500/10 text-indigo-400 font-bold'
+                : (theme === 'light' ? 'border-slate-200 hover:border-slate-300 text-slate-700' : 'border-slate-800 hover:border-slate-700 text-slate-400')"
+            >
+              <span class="text-base">📱</span>
+              <div>
+                <div class="text-xs font-semibold">QRIS Mock</div>
+                <div class="text-[9px] opacity-70">Sandbox Simulator</div>
+              </div>
+            </button>
+
+            <!-- 3. Virtual Account -->
+            <button
+              type="button"
+              @click="selectedPaymentMethod = 'BANK_TRANSFER_VA'"
+              class="p-2.5 rounded-xl border text-left flex items-center gap-2 transition cursor-pointer"
+              :class="selectedPaymentMethod === 'BANK_TRANSFER_VA'
+                ? 'border-indigo-500 bg-indigo-500/10 text-indigo-400 font-bold'
+                : (theme === 'light' ? 'border-slate-200 hover:border-slate-300 text-slate-700' : 'border-slate-800 hover:border-slate-700 text-slate-400')"
+            >
+              <span class="text-base">🏦</span>
+              <div>
+                <div class="text-xs font-semibold">Virtual Account</div>
+                <div class="text-[9px] opacity-70">Mandiri / BCA VA</div>
+              </div>
+            </button>
+
+            <!-- 4. Credit Card -->
+            <button
+              type="button"
+              @click="selectedPaymentMethod = 'CREDIT_CARD'"
+              class="p-2.5 rounded-xl border text-left flex items-center gap-2 transition cursor-pointer"
+              :class="selectedPaymentMethod === 'CREDIT_CARD'
+                ? 'border-indigo-500 bg-indigo-500/10 text-indigo-400 font-bold'
+                : (theme === 'light' ? 'border-slate-200 hover:border-slate-300 text-slate-700' : 'border-slate-800 hover:border-slate-700 text-slate-400')"
+            >
+              <span class="text-base">💳</span>
+              <div>
+                <div class="text-xs font-semibold">Kartu Kredit</div>
+                <div class="text-[9px] opacity-70">3DS Mock Gateway</div>
+              </div>
+            </button>
+          </div>
+        </div>
+
         <!-- Grand Total Summary -->
         <div 
           class="pt-4 border-t space-y-2"
@@ -322,13 +512,32 @@ function handleReceiptClosed() {
           <button 
             @click="submitOrder"
             :disabled="isSubmitting || cart.length === 0"
-            class="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 disabled:opacity-40 text-white font-bold text-sm shadow-lg shadow-emerald-600/30 transition cursor-pointer active:scale-95"
+            class="w-full py-3 rounded-xl disabled:opacity-40 text-white font-bold text-sm shadow-lg transition cursor-pointer active:scale-95 flex items-center justify-center gap-2"
+            :class="!effectiveOnline 
+              ? 'bg-gradient-to-r from-amber-600 to-orange-500 hover:from-amber-500 hover:to-orange-400 shadow-amber-600/30' 
+              : 'bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 shadow-emerald-600/30'"
           >
-            {{ isSubmitting ? 'Memproses...' : t('pos.checkoutBtn') }}
+            <span>
+              {{ isSubmitting 
+                ? 'Memproses...' 
+                : (!effectiveOnline 
+                    ? '⚡ Simpan Transaksi Offline & Cetak Struk' 
+                    : (selectedPaymentMethod === 'CASH' ? t('pos.checkoutBtn') : 'Bayar via Sandbox Simulator &rarr;')) }}
+            </span>
           </button>
         </div>
       </div>
     </div>
+
+    <!-- Mock Payment Gateway Simulator Modal -->
+    <PaymentSimulatorModal
+      :is-open="isSimulatorModalOpen"
+      :order="createdOrder"
+      :format-rupiah="formatRupiah"
+      @close="isSimulatorModalOpen = false"
+      @settled="handlePaymentSettled"
+      @cancelled="handlePaymentCancelled"
+    />
 
     <!-- Receipt Modal on Success -->
     <OrderReceiptModal

@@ -121,7 +121,13 @@ public class DataInitializer {
 
             // 3. Seed Diverse Multi-Date Sample Orders
             if (!orderRepo.existsByOrderNumber("ORD-20260722-0008")) {
-                orderRepo.deleteAll(); // Refresh with rich multi-date seed
+                entityManager.createNativeQuery("DELETE FROM payments").executeUpdate();
+                entityManager.createNativeQuery("DELETE FROM idempotency_records").executeUpdate();
+                entityManager.createNativeQuery("DELETE FROM order_items").executeUpdate();
+                entityManager.createNativeQuery("DELETE FROM orders").executeUpdate();
+                entityManager.flush();
+                entityManager.clear();
+
                 List<Product> products = productRepo.findAll();
                 if (!products.isEmpty()) {
                     Product macbook = products.get(0);
@@ -132,44 +138,66 @@ public class DataInitializer {
 
                     LocalDateTime now = LocalDateTime.now();
 
-                    // T-0 (Today)
+                    // T-0 Active (3 Mins Ago) - ACTIVE PENDING VA (12 Minutes Remaining)
+                    Order o0 = new Order("ORD-20260829-0000", "Rian Hidayat", "rian@hidayat.com", "PENDING", now.minusMinutes(3));
+                    o0.setPaymentMethod("BANK_TRANSFER_VA");
+                    o0.setPaymentRef("880098290000");
+                    o0.addItem(new OrderItem(macbook, 1));
+
+                    // T-0 (Today - 2 Hours Ago) - CASH PAID
                     Order o1 = new Order("ORD-20260826-0001", "Budi Santoso", "budi@mandiri.co.id", "PAID", now.minusHours(2));
+                    o1.setPaymentMethod("CASH");
+                    o1.setPaymentRef("CSH-POS-01");
                     o1.addItem(new OrderItem(macbook, 1));
                     o1.addItem(new OrderItem(mouse, 2));
 
                     // T-2 (2 Days Ago)
                     Order o2 = new Order("ORD-20260824-0002", "Siti Aminah", "siti@mandiri.co.id", "PAID", now.minusDays(2).minusHours(3));
+                    o2.setPaymentMethod("QRIS");
+                    o2.setPaymentRef("QRIS.ID.08240002");
                     o2.addItem(new OrderItem(keyboard, 2));
                     o2.addItem(new OrderItem(mouse, 1));
 
                     // T-4 (4 Days Ago)
                     Order o3 = new Order("ORD-20260822-0003", "PT Digital Kreasi", "finance@kreasi.id", "PAID", now.minusDays(4).minusHours(5));
+                    o3.setPaymentMethod("BANK_TRANSFER_VA");
+                    o3.setPaymentRef("880098220003");
                     o3.addItem(new OrderItem(monitor, 2));
                     o3.addItem(new OrderItem(desk, 1));
 
-                    // T-6 (6 Days Ago)
-                    Order o4 = new Order("ORD-20260820-0004", "Rian Hidayat", "rian@hidayat.com", "PENDING", now.minusDays(6).minusHours(1));
+                    // T-6 (6 Days Ago) - EXPIRED / CANCELLED VA
+                    Order o4 = new Order("ORD-20260820-0004", "PT Solusi Jaya", "finance@solusijaya.co.id", "CANCELLED", now.minusDays(6).minusHours(1));
+                    o4.setPaymentMethod("BANK_TRANSFER_VA");
+                    o4.setPaymentRef("880098200004");
                     o4.addItem(new OrderItem(macbook, 1));
 
                     // T-10 (10 Days Ago)
                     Order o5 = new Order("ORD-20260816-0005", "Mega Pratama", "mega@pratama.co.id", "PAID", now.minusDays(10).minusHours(4));
+                    o5.setPaymentMethod("CREDIT_CARD");
+                    o5.setPaymentRef("AUTH-CC-816005");
                     o5.addItem(new OrderItem(keyboard, 3));
 
                     // T-15 (15 Days Ago)
                     Order o6 = new Order("ORD-20260811-0006", "Hendra Wijaya", "hendra@wijaya.com", "PAID", now.minusDays(15).minusHours(6));
+                    o6.setPaymentMethod("CASH");
+                    o6.setPaymentRef("CSH-POS-02");
                     o6.addItem(new OrderItem(desk, 2));
 
                     // T-20 (20 Days Ago)
                     Order o7 = new Order("ORD-20260806-0007", "Amanda Putri", "amanda@putri.id", "CANCELLED", now.minusDays(20).minusHours(8));
+                    o7.setPaymentMethod("QRIS");
+                    o7.setPaymentRef("QRIS.ID.08060007");
                     o7.addItem(new OrderItem(monitor, 1));
 
                     // T-35 (>30 Days Ago, for Testing 'ALL' vs '30D' Filter)
                     Order o8 = new Order("ORD-20260722-0008", "PT Sumber Rejeki Makmur", "procurement@sumberrejeki.com", "PAID", now.minusDays(35).minusHours(2));
+                    o8.setPaymentMethod("BANK_TRANSFER_VA");
+                    o8.setPaymentRef("880097220008");
                     o8.addItem(new OrderItem(macbook, 2));
                     o8.addItem(new OrderItem(mouse, 5));
                     o8.addItem(new OrderItem(monitor, 2));
 
-                    orderRepo.saveAll(List.of(o1, o2, o3, o4, o5, o6, o7, o8));
+                    orderRepo.saveAll(List.of(o0, o1, o2, o3, o4, o5, o6, o7, o8));
                     System.out.println(">>> [DataInitializer] Diverse multi-date sample orders seeded successfully into PostgreSQL!");
                 }
             }

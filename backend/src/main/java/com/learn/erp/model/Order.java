@@ -28,6 +28,12 @@ public class Order {
     @Column(nullable = false)
     private String status; // PENDING, PAID, CANCELLED
 
+    @Column(length = 30)
+    private String paymentMethod; // CASH, QRIS, BANK_TRANSFER_VA, CREDIT_CARD
+
+    @Column(length = 100)
+    private String paymentRef;
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @JsonManagedReference
     private List<OrderItem> items = new ArrayList<>();
@@ -42,6 +48,16 @@ public class Order {
         this.customerName = customerName;
         this.customerEmail = customerEmail;
         this.status = status != null ? status : "PENDING";
+        this.paymentMethod = "CASH";
+        this.totalAmount = 0.0;
+    }
+
+    public Order(String orderNumber, String customerName, String customerEmail, String status, String paymentMethod) {
+        this.orderNumber = orderNumber;
+        this.customerName = customerName;
+        this.customerEmail = customerEmail;
+        this.status = status != null ? status : "PENDING";
+        this.paymentMethod = paymentMethod != null ? paymentMethod : "CASH";
         this.totalAmount = 0.0;
     }
 
@@ -50,6 +66,7 @@ public class Order {
         this.customerName = customerName;
         this.customerEmail = customerEmail;
         this.status = status != null ? status : "PENDING";
+        this.paymentMethod = "CASH";
         this.totalAmount = 0.0;
         this.createdAt = createdAt;
         this.updatedAt = createdAt;
@@ -101,6 +118,12 @@ public class Order {
 
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
+
+    public String getPaymentMethod() { return paymentMethod; }
+    public void setPaymentMethod(String paymentMethod) { this.paymentMethod = paymentMethod; }
+
+    public String getPaymentRef() { return paymentRef; }
+    public void setPaymentRef(String paymentRef) { this.paymentRef = paymentRef; }
 
     public List<OrderItem> getItems() { return items; }
     public void setItems(List<OrderItem> items) { this.items = items; }

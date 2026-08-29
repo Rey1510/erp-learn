@@ -1,8 +1,20 @@
 <script setup lang="ts">
+import { useOfflineSync } from '~/composables/useOfflineSync'
+
 const route = useRoute()
 const { user, isAuthenticated, isAdmin, isCashier, logout } = useAuth()
 const { t, locale, setLocale } = useI18n()
 const { theme, toggleTheme, isDark } = useTheme()
+
+const {
+  isOnline,
+  isSimulatedOffline,
+  effectiveOnline,
+  pendingSyncCount,
+  toggleSimulatedOffline
+} = useOfflineSync()
+
+const isSyncModalOpen = ref(false)
 
 withDefaults(defineProps<{
   hasError?: boolean
@@ -73,24 +85,52 @@ withDefaults(defineProps<{
         </nav>
       </div>
 
-      <!-- Action Button, Language & Theme Switches, & User Profile -->
-      <div class="flex items-center gap-2 sm:gap-3">
-        <!-- Language Switcher Toggle -->
+      <!-- Action Buttons, Offline Switch, Utility Controls, & User Profile -->
+      <div class="flex items-center gap-1.5 sm:gap-2.5">
+        <!-- 1. Interactive Offline / Online Switcher Pill -->
+        <div class="flex items-center gap-1">
+          <button
+            @click="toggleSimulatedOffline"
+            class="px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 active:scale-95 shadow-sm"
+            :class="effectiveOnline 
+              ? (theme === 'light' ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-emerald-950/40 hover:bg-emerald-900/40 text-emerald-400 border-emerald-800/60')
+              : (theme === 'light' ? 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200 animate-pulse' : 'bg-rose-950/50 hover:bg-rose-900/40 text-rose-400 border-rose-800/80 animate-pulse')"
+            :title="effectiveOnline ? 'Status: ONLINE (Klik untuk beralih ke Mode Simulasi Offline)' : 'Status: OFFLINE (Klik untuk kembali ke Online)'"
+          >
+            <span class="w-2 h-2 rounded-full" :class="effectiveOnline ? 'bg-emerald-500' : 'bg-rose-500'"></span>
+            <span class="text-[11px] font-bold">{{ effectiveOnline ? 'Online' : 'Offline Mode' }}</span>
+          </button>
+
+          <!-- Sync Queue Button (Opens Sync Center Modal) -->
+          <button
+            @click="isSyncModalOpen = true"
+            class="p-1.5 rounded-xl border transition cursor-pointer flex items-center justify-center text-xs"
+            :class="pendingSyncCount > 0 
+              ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-500/30 animate-pulse font-bold' 
+              : (theme === 'light' ? 'bg-slate-100 hover:bg-slate-200 text-slate-600 border-slate-300' : 'bg-slate-800/80 hover:bg-slate-700 text-slate-300 border-slate-700')"
+            title="Buka POS Offline Sync Center"
+          >
+            <span v-if="pendingSyncCount > 0" class="text-[10px] px-1 font-black">⚡ {{ pendingSyncCount }}</span>
+            <span v-else class="text-xs">⚡</span>
+          </button>
+        </div>
+
+        <!-- 2. Language Switcher -->
         <button
           @click="setLocale(locale === 'id' ? 'en' : 'id')"
-          class="px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition cursor-pointer flex items-center gap-1.5"
+          class="px-2 py-1.5 rounded-xl border text-xs font-semibold transition cursor-pointer flex items-center justify-center"
           :class="theme === 'light' 
             ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300' 
             : 'bg-slate-800/80 hover:bg-slate-700 text-slate-200 border-slate-700'"
           :title="locale === 'id' ? 'Switch to English' : 'Ganti ke Bahasa Indonesia'"
         >
-          <span>{{ locale === 'id' ? '🇮🇩 ID' : '🇬🇧 EN' }}</span>
+          <span>{{ locale === 'id' ? 'ID' : 'EN' }}</span>
         </button>
 
-        <!-- Theme Switcher Toggle (Dark / Light) -->
+        <!-- 3. Theme Switcher (Dark / Light) -->
         <button
           @click="toggleTheme"
-          class="p-2 rounded-xl border text-xs font-semibold transition cursor-pointer flex items-center justify-center"
+          class="p-1.5 rounded-xl border text-xs font-semibold transition cursor-pointer flex items-center justify-center"
           :class="theme === 'light' 
             ? 'bg-slate-100 hover:bg-slate-200 text-amber-600 border-slate-300' 
             : 'bg-slate-800/80 hover:bg-slate-700 text-amber-400 border-slate-700'"
@@ -99,63 +139,66 @@ withDefaults(defineProps<{
           <span>{{ isDark ? '🌙' : '☀️' }}</span>
         </button>
 
-        <!-- POS Terminal Quick Action Button -->
+        <!-- 4. POS Terminal Quick Action Button -->
         <NuxtLink 
           to="/orders/create"
-          class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs shadow-lg shadow-emerald-600/20 flex items-center gap-1.5 transition active:scale-95 shrink-0"
+          class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow-md shadow-emerald-600/20 flex items-center gap-1 transition active:scale-95 shrink-0"
         >
           <span class="text-sm font-bold">+</span>
-          <span class="hidden sm:inline">{{ t('nav.pos') }}</span>
+          <span>POS</span>
         </NuxtLink>
 
-        <!-- Authenticated User Profile Menu -->
+        <!-- 5. User Profile Badge & Sleek Vector Sign Out -->
         <div 
           v-if="isAuthenticated && user" 
-          class="flex items-center gap-2 pl-2 border-l"
+          class="flex items-center gap-1.5 sm:gap-2 pl-2 border-l"
           :class="theme === 'light' ? 'border-slate-200' : 'border-slate-800'"
         >
-          <div class="flex items-center gap-2">
-            <!-- Avatar -->
+          <!-- User Compact Badge -->
+          <div class="flex items-center gap-1.5">
             <div 
-              class="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs text-white shadow-sm"
+              class="w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs text-white shadow-sm"
               :class="isAdmin ? 'bg-indigo-600 border border-indigo-400/40' : 'bg-emerald-600 border border-emerald-400/40'"
             >
               {{ user.name.charAt(0).toUpperCase() }}
             </div>
-
-            <!-- User Info & Role Badge -->
-            <div class="hidden lg:flex flex-col text-left">
-              <div class="flex items-center gap-1.5">
-                <span 
-                  class="text-xs font-bold"
-                  :class="theme === 'light' ? 'text-slate-800' : 'text-slate-200'"
-                >
-                  {{ user.name }}
-                </span>
-                <span 
-                  class="px-1.5 py-0.2 rounded text-[9px] font-extrabold uppercase tracking-wide border"
-                  :class="isAdmin ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'"
-                >
-                  {{ user.role }}
-                </span>
-              </div>
-              <span class="text-[10px] text-slate-500 font-mono">{{ user.email }}</span>
+            <div class="hidden xl:flex items-center gap-1">
+              <span 
+                class="text-xs font-bold truncate max-w-[90px]"
+                :class="theme === 'light' ? 'text-slate-800' : 'text-slate-200'"
+              >
+                {{ user.name }}
+              </span>
+              <span 
+                class="px-1.5 py-0.2 rounded text-[8px] font-black uppercase tracking-wider border"
+                :class="isAdmin ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'"
+              >
+                {{ user.role }}
+              </span>
             </div>
           </div>
 
-          <!-- Logout Button -->
+          <!-- Clean Vector Logout Button -->
           <button 
             @click="logout"
-            class="p-2 rounded-lg text-xs border transition cursor-pointer"
-            :class="theme === 'light'
-              ? 'bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 border-slate-300 hover:border-rose-300'
-              : 'bg-slate-800/80 hover:bg-rose-950/50 text-slate-400 hover:text-rose-400 border-slate-700 hover:border-rose-500/30'"
-            :title="t('nav.logout')"
+            class="p-1.5 rounded-xl border transition cursor-pointer flex items-center justify-center text-slate-400 hover:text-rose-400 hover:bg-rose-950/30 border-transparent hover:border-rose-800/40"
+            title="Keluar / Sign Out"
           >
-            🚪 <span class="hidden sm:inline ml-1 font-medium">{{ t('nav.logout') }}</span>
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
           </button>
         </div>
       </div>
     </div>
+
+    <!-- Offline Sync Center Modal -->
+    <OfflineSyncModal 
+      :is-open="isSyncModalOpen" 
+      @close="isSyncModalOpen = false" 
+      @synced="refreshNuxtData"
+    />
   </header>
 </template>

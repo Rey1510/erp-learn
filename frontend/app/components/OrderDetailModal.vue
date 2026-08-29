@@ -14,6 +14,7 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   (e: 'close'): void
   (e: 'updateStatus', orderId: number, newStatus: string): void
+  (e: 'openSimulator', order: Order): void
 }>()
 
 const { t, locale } = useI18n()
@@ -160,10 +161,10 @@ function handleSetStatus(newStatus: string) {
           <div class="flex items-center gap-2">
             <template v-if="order.status === 'PENDING'">
               <button 
-                @click="handleSetStatus('PAID')"
-                class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-600/30 transition cursor-pointer active:scale-95"
+                @click="emit('openSimulator', order)"
+                class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-600/30 transition cursor-pointer active:scale-95 flex items-center gap-1.5"
               >
-                ✓ {{ t('orders.setPaid') }}
+                <span>💳</span> {{ locale === 'id' ? 'Bayar via Sandbox Simulator' : 'Pay via Sandbox Gateway' }}
               </button>
               <button 
                 @click="handleSetStatus('CANCELLED')"

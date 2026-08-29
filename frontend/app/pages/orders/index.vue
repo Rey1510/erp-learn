@@ -40,8 +40,38 @@ const isDetailModalOpen = ref(false)
 const selectedReceiptOrder = ref<Order | null>(null)
 const isReceiptModalOpen = ref(false)
 
+const selectedSimulatorOrder = ref<Order | null>(null)
+const isSimulatorModalOpen = ref(false)
+
+const activeDropdownOrderId = ref<number | null>(null)
+
 const toastMessage = ref('')
 const showToast = ref(false)
+
+onMounted(() => {
+  refresh()
+  if (import.meta.client) {
+    window.addEventListener('click', closeDropdown)
+  }
+})
+
+onUnmounted(() => {
+  if (import.meta.client) {
+    window.removeEventListener('click', closeDropdown)
+  }
+})
+
+function toggleDropdown(orderId: number) {
+  if (activeDropdownOrderId.value === orderId) {
+    activeDropdownOrderId.value = null
+  } else {
+    activeDropdownOrderId.value = orderId
+  }
+}
+
+function closeDropdown() {
+  activeDropdownOrderId.value = null
+}
 
 function triggerToast(msg: string) {
   toastMessage.value = msg
@@ -57,6 +87,25 @@ function openDetail(order: Order) {
 function openReceipt(order: Order) {
   selectedReceiptOrder.value = order
   isReceiptModalOpen.value = true
+}
+
+function openSimulator(order: Order) {
+  selectedSimulatorOrder.value = order
+  isSimulatorModalOpen.value = true
+  isDetailModalOpen.value = false
+}
+
+function handleSimulatorSettled(updatedOrder: Order) {
+  isSimulatorModalOpen.value = false
+  triggerToast('✅ Pembayaran berhasil diselesaikan via Sandbox Simulator!')
+  refresh()
+  openReceipt(updatedOrder)
+}
+
+function handleSimulatorCancelled(updatedOrder: Order) {
+  isSimulatorModalOpen.value = false
+  triggerToast('Transaksi dibatalkan. Stok produk otomatis dipulihkan ke katalog.')
+  refresh()
 }
 
 async function handleStatusChange(orderId: number, newStatus: string) {
@@ -285,7 +334,7 @@ function getSortIcon(field: string) {
                 {{ t('orders.total') }} <span class="ml-1 text-[10px] text-slate-400">{{ getSortIcon('totalAmount') }}</span>
               </th>
               <th scope="col" class="px-5 py-3.5 font-semibold text-center whitespace-nowrap">{{ t('orders.status') }}</th>
-              <th scope="col" class="px-5 py-3.5 font-semibold text-right whitespace-nowrap min-w-[220px]">{{ t('home.actions') }}</th>
+              <th scope="col" class="px-5 py-3.5 font-semibold text-right whitespace-nowrap w-48">{{ t('home.actions') }}</th>
             </tr>
           </thead>
           <tbody class="divide-y" :class="theme === 'light' ? 'divide-slate-200' : 'divide-slate-800/60'">
@@ -302,8 +351,9 @@ function getSortIcon(field: string) {
               v-else
               v-for="order in filteredOrders" 
               :key="order.id"
-              class="transition-colors"
+              class="transition-colors cursor-pointer group"
               :class="theme === 'light' ? 'hover:bg-slate-50' : 'hover:bg-slate-800/30'"
+              @click="openDetail(order)"
             >
               <td class="px-5 py-4 font-mono font-bold whitespace-nowrap" :class="theme === 'light' ? 'text-indigo-600' : 'text-indigo-300'">
                 {{ order.orderNumber }}
@@ -346,41 +396,111 @@ function getSortIcon(field: string) {
                   Dibatalkan
                 </span>
               </td>
-              <td class="px-5 py-4 text-right whitespace-nowrap min-w-[220px]">
-                <div class="inline-flex items-center gap-2 shrink-0 justify-end">
+              <td class="px-5 py-4 text-right whitespace-nowrap w-48" @click.stop>
+                <div class="relative inline-flex items-center justify-end gap-1.5">
+                  <!-- Primary Action Hero Button -->
+                  <template v-if="order.status === 'PENDING'">
+                    <button 
+                      @click="openSimulator(order)"
+                      class="px-3 py-1.5 text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl transition shadow-md shadow-indigo-600/30 flex items-center gap-1.5 cursor-pointer active:scale-95 shrink-0"
+                      title="Lanjutkan Pembayaran via Mock Payment Gateway Sandbox"
+                    >
+                      <span>💳</span> Bayar
+                    </button>
+                  </template>
+                  <template v-else-if="order.status === 'PAID'">
+                    <button 
+                      @click="openReceipt(order)"
+                      class="px-3 py-1.5 text-xs font-semibold rounded-xl border transition flex items-center gap-1.5 cursor-pointer active:scale-95 shrink-0"
+                      :class="theme === 'light'
+                        ? 'bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-300 shadow-sm'
+                        : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'"
+                      title="Cetak Struk Transaksi POS"
+                    >
+                      <span>🧾</span> Struk
+                    </button>
+                  </template>
+                  <template v-else>
+                    <button 
+                      @click="openDetail(order)"
+                      class="px-3 py-1.5 text-xs font-semibold rounded-xl border transition flex items-center gap-1.5 cursor-pointer active:scale-95 shrink-0"
+                      :class="theme === 'light'
+                        ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300 shadow-sm'
+                        : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'"
+                    >
+                      <span>👁️</span> Detail
+                    </button>
+                  </template>
+
+                  <!-- Action Dropdown Trigger (•••) -->
                   <button 
-                    @click="openReceipt(order)"
-                    class="px-2.5 py-1 text-xs font-medium rounded-lg border transition cursor-pointer flex items-center gap-1 shrink-0"
-                    :class="theme === 'light'
-                      ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
-                      : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'"
-                    title="Cetak Struk Transaksi"
+                    @click="toggleDropdown(order.id)"
+                    class="p-1.5 rounded-xl border transition cursor-pointer flex items-center justify-center shrink-0"
+                    :class="[
+                      activeDropdownOrderId === order.id
+                        ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/30'
+                        : (theme === 'light' 
+                            ? 'bg-white hover:bg-slate-100 text-slate-600 border-slate-300 shadow-sm' 
+                            : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700')
+                    ]"
+                    title="Menu Aksi Lainnya"
                   >
-                    <span>🧾</span> {{ t('orders.receipt') }}
+                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                      <circle cx="12" cy="5" r="2"/>
+                      <circle cx="12" cy="12" r="2"/>
+                      <circle cx="12" cy="19" r="2"/>
+                    </svg>
                   </button>
-                  <button 
-                    @click="openDetail(order)"
-                    class="px-2.5 py-1 text-xs font-medium rounded-lg border transition cursor-pointer shrink-0"
-                    :class="theme === 'light'
-                      ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
-                      : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'"
+
+                  <!-- Popover Dropdown Menu -->
+                  <Transition
+                    enter-active-class="transition duration-150 ease-out"
+                    enter-from-class="transform scale-95 opacity-0 -translate-y-1"
+                    enter-to-class="transform scale-100 opacity-100 translate-y-0"
+                    leave-active-class="transition duration-100 ease-in"
+                    leave-from-class="transform scale-100 opacity-100"
+                    leave-to-class="transform scale-95 opacity-0 -translate-y-1"
                   >
-                    {{ t('orders.detail') }}
-                  </button>
-                  <button 
-                    v-if="order.status === 'PENDING'"
-                    @click="handleStatusChange(order.id, 'PAID')"
-                    class="px-2.5 py-1 text-xs font-medium text-emerald-500 hover:bg-emerald-50 rounded-lg border border-emerald-500/40 transition cursor-pointer shrink-0"
-                  >
-                    {{ t('orders.setPaid') }}
-                  </button>
-                  <button 
-                    v-if="order.status === 'PENDING'"
-                    @click="handleStatusChange(order.id, 'CANCELLED')"
-                    class="px-2.5 py-1 text-xs font-medium text-rose-500 hover:bg-rose-50 rounded-lg border border-rose-500/40 transition cursor-pointer shrink-0"
-                  >
-                    {{ t('orders.cancel') }}
-                  </button>
+                    <div 
+                      v-if="activeDropdownOrderId === order.id"
+                      class="absolute right-0 top-full mt-1.5 w-48 rounded-2xl border shadow-2xl z-30 py-1.5 text-left text-xs backdrop-blur-xl animate-in fade-in"
+                      :class="theme === 'light'
+                        ? 'bg-white/95 border-slate-200 text-slate-800 shadow-slate-300/50'
+                        : 'bg-slate-900/95 border-slate-800 text-slate-200 shadow-black/80'"
+                    >
+                      <button 
+                        @click="openDetail(order); closeDropdown()"
+                        class="w-full px-3.5 py-2 flex items-center gap-2.5 hover:bg-indigo-500/10 hover:text-indigo-400 transition cursor-pointer"
+                      >
+                        <span>👁️</span> Lihat Detail Pesanan
+                      </button>
+
+                      <button 
+                        @click="openReceipt(order); closeDropdown()"
+                        class="w-full px-3.5 py-2 flex items-center gap-2.5 hover:bg-emerald-500/10 hover:text-emerald-400 transition cursor-pointer"
+                      >
+                        <span>🧾</span> Cetak Struk POS (PDF)
+                      </button>
+
+                      <template v-if="order.status === 'PENDING'">
+                        <div class="my-1 border-t" :class="theme === 'light' ? 'border-slate-100' : 'border-slate-800'"></div>
+
+                        <button 
+                          @click="openSimulator(order); closeDropdown()"
+                          class="w-full px-3.5 py-2 flex items-center gap-2.5 text-indigo-500 hover:bg-indigo-500/10 font-semibold transition cursor-pointer"
+                        >
+                          <span>💳</span> Bayar via Sandbox
+                        </button>
+
+                        <button 
+                          @click="handleStatusChange(order.id, 'CANCELLED'); closeDropdown()"
+                          class="w-full px-3.5 py-2 flex items-center gap-2.5 text-rose-500 hover:bg-rose-500/10 transition cursor-pointer"
+                        >
+                          <span>✕</span> Batalkan Transaksi
+                        </button>
+                      </template>
+                    </div>
+                  </Transition>
                 </div>
               </td>
             </tr>
@@ -423,6 +543,16 @@ function getSortIcon(field: string) {
       :format-date="formatDate"
       @close="isDetailModalOpen = false"
       @update-status="handleStatusChange"
+      @open-simulator="openSimulator"
+    />
+
+    <PaymentSimulatorModal
+      :is-open="isSimulatorModalOpen"
+      :order="selectedSimulatorOrder"
+      :format-rupiah="formatRupiah"
+      @close="isSimulatorModalOpen = false"
+      @settled="handleSimulatorSettled"
+      @cancelled="handleSimulatorCancelled"
     />
 
     <OrderReceiptModal

@@ -94,6 +94,10 @@ function handlePrint() {
         <span class="text-slate-500">No. Order:</span>
         <span class="font-bold">${props.order.orderNumber}</span>
       </div>
+      ${(props.order.orderNumber?.startsWith('OFFLINE') || props.order.paymentRef?.includes('OFFLINE')) ? `
+      <div class="text-center" style="margin: 4px 0;">
+        <span class="badge" style="background: #fef3c7; color: #92400e; border-color: #f59e0b; font-size: 9px;">⚡ OFFLINE QUEUED (IndexedDB)</span>
+      </div>` : ''}
       <div class="flex-between">
         <span class="text-slate-500">Tanggal:</span>
         <span>${props.formatDate(props.order.createdAt)}</span>
@@ -111,6 +115,15 @@ function handlePrint() {
         <span class="text-slate-500">Kasir:</span>
         <span>POS Terminal 01</span>
       </div>
+      <div class="flex-between">
+        <span class="text-slate-500">Metode Bayar:</span>
+        <span class="font-bold">${props.order.paymentMethod || 'CASH'}</span>
+      </div>
+      ${props.order.paymentRef ? `
+      <div class="flex-between">
+        <span class="text-slate-500">No. Ref / VA:</span>
+        <span style="font-size: 10px; font-family: monospace;">${props.order.paymentRef}</span>
+      </div>` : ''}
     </div>
 
     <div class="border-b-dashed">
@@ -179,33 +192,34 @@ function handlePrint() {
 </script>
 
 <template>
-  <div 
-    v-if="isOpen && order" 
-    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm"
-    @click.self="emit('close')"
-  >
-    <!-- Modal Card (Screen View) -->
-    <div class="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-      <!-- Modal Header -->
-      <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
-        <div class="flex items-center gap-2">
-          <span class="text-lg">🧾</span>
-          <h3 class="font-bold text-sm text-white">Struk Transaksi POS</h3>
+  <Teleport to="body">
+    <div 
+      v-if="isOpen && order" 
+      class="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200"
+      @click.self="emit('close')"
+    >
+      <!-- Modal Card (Screen View) -->
+      <div class="bg-slate-900 border border-slate-700/80 w-full max-w-md max-h-[90vh] flex flex-col rounded-2xl shadow-2xl overflow-hidden text-white">
+        <!-- Modal Header (Fixed) -->
+        <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/80 flex-shrink-0">
+          <div class="flex items-center gap-2">
+            <span class="text-lg">🧾</span>
+            <h3 class="font-bold text-sm text-white">Struk Transaksi POS</h3>
+          </div>
+          <button 
+            @click="emit('close')" 
+            class="text-slate-400 hover:text-white text-lg font-bold transition cursor-pointer p-1"
+          >
+            &times;
+          </button>
         </div>
-        <button 
-          @click="emit('close')" 
-          class="text-slate-400 hover:text-white text-lg font-bold transition cursor-pointer"
-        >
-          &times;
-        </button>
-      </div>
 
-      <!-- Thermal Receipt Preview -->
-      <div class="p-6 bg-slate-900 flex justify-center max-h-[70vh] overflow-y-auto">
-        <div 
-          id="receipt-print-area" 
-          class="w-full max-w-[340px] bg-white text-slate-900 font-mono text-xs p-6 rounded-xl shadow-lg border border-slate-200"
-        >
+        <!-- Thermal Receipt Preview (Scrollable Content) -->
+        <div class="p-4 sm:p-6 bg-slate-950/60 flex justify-center overflow-y-auto flex-1 min-h-0">
+          <div 
+            id="receipt-print-area" 
+            class="w-full max-w-[340px] bg-white text-slate-900 font-mono text-xs p-6 pb-8 rounded-2xl shadow-2xl border border-slate-200 h-fit"
+          >
           <!-- Store Header -->
           <div class="text-center pb-4 border-b border-dashed border-slate-400">
             <div class="w-8 h-8 mx-auto mb-1 bg-slate-900 text-white rounded-lg flex items-center justify-center font-bold text-xs">
@@ -220,7 +234,12 @@ function handlePrint() {
           <div class="py-3 border-b border-dashed border-slate-400 space-y-1 text-[11px]">
             <div class="flex justify-between">
               <span class="text-slate-500">No. Order:</span>
-              <span class="font-bold">{{ order.orderNumber }}</span>
+              <span class="font-bold font-mono">{{ order.orderNumber }}</span>
+            </div>
+            <div v-if="order.orderNumber?.startsWith('OFFLINE') || order.paymentRef?.includes('OFFLINE')" class="text-center py-1">
+              <span class="inline-block px-2 py-0.5 rounded bg-amber-100 text-amber-900 text-[9px] font-bold border border-amber-300">
+                ⚡ OFFLINE QUEUED (IndexedDB)
+              </span>
             </div>
             <div class="flex justify-between">
               <span class="text-slate-500">Tanggal:</span>
@@ -237,6 +256,14 @@ function handlePrint() {
             <div class="flex justify-between">
               <span class="text-slate-500">Kasir:</span>
               <span>POS Terminal 01</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-500">Metode:</span>
+              <span class="font-bold text-slate-800">{{ order.paymentMethod || 'CASH' }}</span>
+            </div>
+            <div v-if="order.paymentRef" class="flex justify-between">
+              <span class="text-slate-500">No. Ref:</span>
+              <span class="font-mono text-[10px] text-slate-700 font-semibold">{{ order.paymentRef }}</span>
             </div>
           </div>
 
@@ -312,8 +339,8 @@ function handlePrint() {
         </div>
       </div>
 
-      <!-- Action Buttons Footer -->
-      <div class="px-6 py-4 border-t border-slate-800 bg-slate-950/60 flex items-center justify-between gap-3">
+      <!-- Action Buttons Footer (Fixed at Bottom) -->
+      <div class="px-6 py-4 border-t border-slate-800 bg-slate-950/80 flex items-center justify-between gap-3 flex-shrink-0">
         <button 
           @click="emit('close')" 
           class="px-4 py-2 rounded-xl text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 transition cursor-pointer"
@@ -329,4 +356,5 @@ function handlePrint() {
       </div>
     </div>
   </div>
+  </Teleport>
 </template>

@@ -1,8 +1,13 @@
 <script setup lang="ts">
-// 1. Fetch Orders from useOrders composable
-const { orders, pending: ordersPending, refresh: refreshOrders, reseedOrders, formatRupiah } = useOrders()
+// 1. Fetch Orders & Products composables
+const { allOrders, pending: ordersPending, refresh: refreshOrders, reseedOrders, formatRupiah } = useOrders()
+const { refresh: refreshProducts } = useProducts()
 const { t, locale } = useI18n()
 const { theme } = useTheme()
+
+onMounted(() => {
+  refreshOrders()
+})
 
 // 2. Encapsulated Analytics Business Logic from useAnalytics composable
 const {
@@ -21,17 +26,27 @@ const {
   svgAreaPath,
   topSellingProducts,
   categorySales
-} = useAnalytics(orders)
+} = useAnalytics(allOrders)
 
-// 3. Reseed Handler
+// 3. Reseed / Cleanse Handler
 const isReseeding = ref(false)
 
 async function handleReseed() {
+  if (!confirm(locale.value === 'id' 
+    ? 'Apakah Anda yakin ingin membersihkan (cleanse) seluruh data transaksi & stok, lalu mengembalikan database ke data awal yang bersih?' 
+    : 'Are you sure you want to cleanse all test transactions and reset catalog inventory to clean initial demo data?')) {
+    return
+  }
+
   isReseeding.value = true
   try {
     await reseedOrders()
+    await Promise.all([refreshOrders(), refreshProducts()])
+    alert(locale.value === 'id' 
+      ? '✅ Database berhasil dibersihkan & di-reset ke kondisi awal yang bersih!' 
+      : '✅ Database successfully cleansed & reset to clean demo state!')
   } catch (err: any) {
-    alert('Gagal reseed data: ' + (err.message || err))
+    alert('Gagal membersihkan & reset data: ' + (err.message || err))
   } finally {
     isReseeding.value = false
   }
@@ -116,11 +131,11 @@ async function handleReseed() {
           :disabled="isReseeding"
           class="px-3.5 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer disabled:opacity-50 flex items-center gap-1.5 active:scale-95"
           :class="theme === 'light'
-            ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200 shadow-sm'
-            : 'bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 border-indigo-500/40'"
-          title="Populate diverse multi-date sample transactions into PostgreSQL"
+            ? 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200 shadow-sm'
+            : 'bg-rose-950/40 hover:bg-rose-900/50 text-rose-300 border-rose-500/40'"
+          title="Bersihkan seluruh data transaksi uji coba dan pulihkan stok katalog ke data demo awal yang bersih"
         >
-          <span>⚡</span> {{ isReseeding ? 'Seeding...' : (locale === 'id' ? 'Seed Sample Data' : 'Seed Sample Data') }}
+          <span>🧹</span> {{ isReseeding ? (locale === 'id' ? 'Membersihkan...' : 'Cleansing...') : (locale === 'id' ? 'Cleanse & Reset Demo' : 'Cleanse & Reset Demo') }}
         </button>
       </div>
     </section>

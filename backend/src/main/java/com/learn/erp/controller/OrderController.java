@@ -1,6 +1,7 @@
 package com.learn.erp.controller;
 
 import com.learn.erp.dto.CreateOrderRequest;
+import com.learn.erp.exception.InsufficientStockException;
 import com.learn.erp.model.Order;
 import com.learn.erp.service.OrderService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -8,12 +9,13 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api/orders")
-@CrossOrigin(origins = {"http://localhost:3000", "http://127.0.0.1:3000"})
+@CrossOrigin(origins = {"http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3001", "http://127.0.0.1:3001"})
 public class OrderController {
 
     private final OrderService orderService;
@@ -47,10 +49,24 @@ public class OrderController {
     }
 
     @PostMapping
-    public ResponseEntity<?> createOrder(@RequestBody CreateOrderRequest request) {
+    public ResponseEntity<?> createOrder(
+            @RequestBody CreateOrderRequest request,
+            @RequestHeader(value = "X-Idempotency-Key", required = false) String idempotencyHeader) {
         try {
+            if (idempotencyHeader != null && !idempotencyHeader.isBlank()) {
+                request.setIdempotencyKey(idempotencyHeader.trim());
+            }
             Order created = orderService.createOrder(request);
             return ResponseEntity.status(HttpStatus.CREATED).body(created);
+        } catch (InsufficientStockException e) {
+            Map<String, Object> errorDetails = new HashMap<>();
+            errorDetails.put("code", "INSUFFICIENT_STOCK");
+            errorDetails.put("error", e.getMessage());
+            errorDetails.put("productId", e.getProductId());
+            errorDetails.put("productName", e.getProductName());
+            errorDetails.put("availableStock", e.getAvailableStock());
+            errorDetails.put("requestedQuantity", e.getRequestedQuantity());
+            return ResponseEntity.badRequest().body(errorDetails);
         } catch (IllegalArgumentException | IllegalStateException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
